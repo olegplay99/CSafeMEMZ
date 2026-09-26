@@ -1,8 +1,8 @@
 #include "engine.h"
 #include "timeline.h"
+#include "../effects/effects.h"
 
 #include <windows.h>
-#include <stdio.h>
 
 typedef struct
 {
@@ -10,6 +10,9 @@ typedef struct
     DWORD startTime;
     DWORD elapsed;
     TimelineEvent currentEvent;
+
+    int width;
+    int height;
 } EngineState;
 
 static void EngineInit(EngineState* state)
@@ -18,6 +21,11 @@ static void EngineInit(EngineState* state)
     state->startTime = GetTickCount();
     state->elapsed = 0;
     state->currentEvent = EVENT_NONE;
+
+    state->width = GetSystemMetrics(SM_CXSCREEN);
+    state->height = GetSystemMetrics(SM_CYSCREEN);
+
+    EffectsInit(NULL);
 }
 
 static void EngineUpdate(EngineState* state)
@@ -35,31 +43,43 @@ static void EngineProcessEvents(EngineState* state)
     if (event != state->currentEvent)
     {
         state->currentEvent = event;
-
-        switch (event)
-        {
-            case EVENT_TEST_1:
-                printf("[ENGINE] Event 1\n");
-                break;
-
-            case EVENT_TEST_2:
-                printf("[ENGINE] Event 2\n");
-                break;
-
-            case EVENT_TEST_3:
-                printf("[ENGINE] Event 3\n");
-                break;
-
-            case EVENT_NONE:
-                printf("[ENGINE] Timeline finished\n");
-                break;
-        }
     }
 
     if (TimelineIsFinished(state->elapsed))
     {
         state->running = FALSE;
     }
+}
+
+static void EngineRender(EngineState* state)
+{
+    HDC hdc = GetDC(NULL);
+
+    if (!hdc)
+        return;
+
+    switch (state->currentEvent)
+    {
+        case EVENT_TEST_1:
+            EffectGlitch(
+                hdc,
+                state->width,
+                state->height,
+                state->elapsed
+            );
+            break;
+
+        case EVENT_TEST_2:
+            break;
+
+        case EVENT_TEST_3:
+            break;
+
+        default:
+            break;
+    }
+
+    ReleaseDC(NULL, hdc);
 }
 
 BOOL EngineRun(HINSTANCE hInstance)
@@ -75,6 +95,8 @@ BOOL EngineRun(HINSTANCE hInstance)
         EngineUpdate(&state);
 
         EngineProcessEvents(&state);
+
+        EngineRender(&state);
 
         Sleep(16);
     }
