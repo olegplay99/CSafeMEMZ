@@ -1,28 +1,25 @@
 #include "engine.h"
+#include "timeline.h"
 
 #include <windows.h>
+#include <stdio.h>
 
-/* Состояние движка */
 typedef struct
 {
     BOOL running;
     DWORD startTime;
     DWORD elapsed;
+    TimelineEvent currentEvent;
 } EngineState;
 
-/*
- * Инициализация движка.
- */
 static void EngineInit(EngineState* state)
 {
     state->running = TRUE;
     state->startTime = GetTickCount();
     state->elapsed = 0;
+    state->currentEvent = EVENT_NONE;
 }
 
-/*
- * Обновление времени.
- */
 static void EngineUpdate(EngineState* state)
 {
     DWORD now = GetTickCount();
@@ -30,29 +27,41 @@ static void EngineUpdate(EngineState* state)
     state->elapsed = now - state->startTime;
 }
 
-/*
- * Здесь позже появится система событий.
- */
-static void EngineProcessEvents(
-    EngineState* state
-)
+static void EngineProcessEvents(EngineState* state)
 {
-    /*
-     * Пока движок просто работает.
-     *
-     * Позже здесь будет примерно:
-     *
-     * 0s   -> первое событие
-     * 5s   -> второе событие
-     * 12s  -> третье событие
-     * ...
-     */
-    (void)state;
+    TimelineEvent event =
+        TimelineGetEvent(state->elapsed);
+
+    if (event != state->currentEvent)
+    {
+        state->currentEvent = event;
+
+        switch (event)
+        {
+            case EVENT_TEST_1:
+                printf("[ENGINE] Event 1\n");
+                break;
+
+            case EVENT_TEST_2:
+                printf("[ENGINE] Event 2\n");
+                break;
+
+            case EVENT_TEST_3:
+                printf("[ENGINE] Event 3\n");
+                break;
+
+            case EVENT_NONE:
+                printf("[ENGINE] Timeline finished\n");
+                break;
+        }
+    }
+
+    if (TimelineIsFinished(state->elapsed))
+    {
+        state->running = FALSE;
+    }
 }
 
-/*
- * Главный цикл.
- */
 BOOL EngineRun(HINSTANCE hInstance)
 {
     (void)hInstance;
@@ -66,16 +75,6 @@ BOOL EngineRun(HINSTANCE hInstance)
         EngineUpdate(&state);
 
         EngineProcessEvents(&state);
-
-        /*
-         * Пока это просто тестовый цикл.
-         * Позже здесь будет отрисовка и обработка
-         * событий Windows.
-         */
-        if (state.elapsed >= 3000)
-        {
-            state.running = FALSE;
-        }
 
         Sleep(16);
     }
