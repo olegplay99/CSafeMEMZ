@@ -2,16 +2,9 @@
 #define CSAFEMEMZ_TIMELINE_H
 
 #include <windows.h>
+#include "event.h"
 
-typedef enum
-{
-    EVENT_NONE = 0,
-    EVENT_TEST_1,
-    EVENT_TEST_2,
-    EVENT_TEST_3
-} TimelineEvent;
-
-TimelineEvent TimelineGetEvent(DWORD elapsed);
+EventType TimelineGetEvent(DWORD elapsed);
 
 BOOL TimelineIsFinished(DWORD elapsed);
 

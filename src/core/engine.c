@@ -1,5 +1,6 @@
 #include "engine.h"
 #include "timeline.h"
+#include "event.h"
 #include "../effects/effects.h"
 
 #include <windows.h>
@@ -7,23 +8,31 @@
 typedef struct
 {
     BOOL running;
+
     DWORD startTime;
     DWORD elapsed;
-    TimelineEvent currentEvent;
+
+    EventType currentEvent;
 
     int width;
     int height;
+
 } EngineState;
 
 static void EngineInit(EngineState* state)
 {
     state->running = TRUE;
+
     state->startTime = GetTickCount();
     state->elapsed = 0;
+
     state->currentEvent = EVENT_NONE;
 
-    state->width = GetSystemMetrics(SM_CXSCREEN);
-    state->height = GetSystemMetrics(SM_CYSCREEN);
+    state->width =
+        GetSystemMetrics(SM_CXSCREEN);
+
+    state->height =
+        GetSystemMetrics(SM_CYSCREEN);
 
     EffectsInit(NULL);
 }
@@ -32,17 +41,32 @@ static void EngineUpdate(EngineState* state)
 {
     DWORD now = GetTickCount();
 
-    state->elapsed = now - state->startTime;
+    state->elapsed =
+        now - state->startTime;
 }
 
-static void EngineProcessEvents(EngineState* state)
+static void EngineProcessEvents(
+    EngineState* state
+)
 {
-    TimelineEvent event =
+    EventType event =
         TimelineGetEvent(state->elapsed);
 
     if (event != state->currentEvent)
     {
+        if (state->currentEvent != EVENT_NONE)
+        {
+            EventStop(
+                state->currentEvent
+            );
+        }
+
         state->currentEvent = event;
+
+        if (event != EVENT_NONE)
+        {
+            EventStart(event);
+        }
     }
 
     if (TimelineIsFinished(state->elapsed))
@@ -51,7 +75,9 @@ static void EngineProcessEvents(EngineState* state)
     }
 }
 
-static void EngineRender(EngineState* state)
+static void EngineRender(
+    EngineState* state
+)
 {
     HDC hdc = GetDC(NULL);
 
@@ -60,19 +86,70 @@ static void EngineRender(EngineState* state)
 
     switch (state->currentEvent)
     {
-        case EVENT_TEST_1:
+        case EVENT_GLITCH:
+
             EffectGlitch(
                 hdc,
                 state->width,
                 state->height,
                 state->elapsed
             );
+
             break;
 
-        case EVENT_TEST_2:
+        case EVENT_SHAKE:
+
+            EffectShake(
+                hdc,
+                state->width,
+                state->height,
+                state->elapsed
+            );
+
             break;
 
-        case EVENT_TEST_3:
+        case EVENT_TEAR:
+
+            EffectTear(
+                hdc,
+                state->width,
+                state->height,
+                state->elapsed
+            );
+
+            break;
+
+        case EVENT_COLOR_SHIFT:
+
+            EffectColorShift(
+                hdc,
+                state->width,
+                state->height,
+                state->elapsed
+            );
+
+            break;
+
+        case EVENT_RECTS:
+
+            EffectRects(
+                hdc,
+                state->width,
+                state->height,
+                state->elapsed
+            );
+
+            break;
+
+        case EVENT_FLASH:
+
+            EffectFlash(
+                hdc,
+                state->width,
+                state->height,
+                state->elapsed
+            );
+
             break;
 
         default:
