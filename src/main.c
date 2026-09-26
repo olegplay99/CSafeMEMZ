@@ -2,6 +2,7 @@
 
 #include "ui/intro.h"
 #include "ui/outro.h"
+#include "core/engine.h"
 
 int WINAPI WinMain(
     HINSTANCE hInstance,
@@ -17,10 +18,7 @@ int WINAPI WinMain(
     if (!ShowIntro(hInstance))
         return 0;
 
-    /*
-        Здесь позже появится основной
-        CSafeMEMZ engine.
-    */
+    EngineRun(hInstance);
 
     ShowOutro(hInstance);
 
