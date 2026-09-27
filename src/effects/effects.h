@@ -55,4 +55,39 @@ void EffectChaos(
     int intensity
 );
 
+void EffectSwirl(
+    HDC hdc,
+    int width,
+    int height,
+    DWORD elapsed
+);
+
+void EffectScanlines(
+    HDC hdc,
+    int width,
+    int height,
+    DWORD elapsed
+);
+
+void EffectPixelate(
+    HDC hdc,
+    int width,
+    int height,
+    DWORD elapsed
+);
+
+void EffectMirror(
+    HDC hdc,
+    int width,
+    int height,
+    DWORD elapsed
+);
+
+void EffectRGBSplit(
+    HDC hdc,
+    int width,
+    int height,
+    DWORD elapsed
+);
+
 #endif

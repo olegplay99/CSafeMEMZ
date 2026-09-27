@@ -5,7 +5,6 @@
 #include "event.h"
 
 EventType TimelineGetEvent(DWORD elapsed);
-
 BOOL TimelineIsFinished(DWORD elapsed);
 
 #endif

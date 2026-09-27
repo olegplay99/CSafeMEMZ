@@ -5,14 +5,10 @@
 
 static HWND g_window = NULL;
 
-
 void EffectsInit(HWND hwnd)
 {
     g_window = hwnd;
-
-    (void)g_window;
 }
-
 
 /* =========================================================
    GLITCH
@@ -25,10 +21,9 @@ void EffectGlitch(
     DWORD elapsed
 )
 {
-    int offset =
-        (int)((elapsed / 40) % 20);
+    int offset = (int)((elapsed / 40) % 30) - 15;
 
-    if ((elapsed / 100) % 2 == 0)
+    if (offset >= 0)
     {
         BitBlt(
             hdc,
@@ -48,16 +43,15 @@ void EffectGlitch(
             hdc,
             0,
             0,
-            width - offset,
+            width + offset,
             height,
             hdc,
-            offset,
+            -offset,
             0,
             SRCCOPY
         );
     }
 }
-
 
 /* =========================================================
    SHAKE
@@ -71,22 +65,16 @@ void EffectShake(
 )
 {
     int offsetX =
-        (int)((elapsed / 17) % 31) - 15;
+        (int)((elapsed / 17) % 25) - 12;
 
     int offsetY =
-        (int)((elapsed / 23) % 25) - 12;
+        (int)((elapsed / 23) % 21) - 10;
 
-    int copyWidth =
-        width - abs(offsetX);
+    int copyWidth = width - abs(offsetX);
+    int copyHeight = height - abs(offsetY);
 
-    int copyHeight =
-        height - abs(offsetY);
-
-    if (copyWidth <= 0 ||
-        copyHeight <= 0)
-    {
+    if (copyWidth <= 0 || copyHeight <= 0)
         return;
-    }
 
     BitBlt(
         hdc,
@@ -95,15 +83,14 @@ void EffectShake(
         copyWidth,
         copyHeight,
         hdc,
-        0,
-        0,
+        offsetX < 0 ? -offsetX : 0,
+        offsetY < 0 ? -offsetY : 0,
         SRCCOPY
     );
 }
 
-
 /* =========================================================
-   HORIZONTAL TEAR
+   TEAR
    ========================================================= */
 
 void EffectTear(
@@ -113,52 +100,50 @@ void EffectTear(
     DWORD elapsed
 )
 {
-    srand(
-        (unsigned int)(elapsed / 30)
-    );
+    srand((unsigned int)(elapsed / 35));
 
-    const int bands = 12;
-
-    for (int i = 0; i < bands; ++i)
+    for (int i = 0; i < 16; ++i)
     {
-        int y =
-            rand() % height;
-
-        int bandHeight =
-            2 + rand() % 35;
-
-        int offset =
-            (rand() % 81) - 40;
-
-        int copyWidth =
-            width - abs(offset);
+        int y = rand() % height;
+        int bandHeight = 3 + rand() % 30;
+        int offset = (rand() % 101) - 50;
 
         if (y + bandHeight > height)
-        {
-            bandHeight =
-                height - y;
-        }
+            bandHeight = height - y;
 
-        if (bandHeight <= 0 ||
-            copyWidth <= 0)
-        {
+        if (bandHeight <= 0)
             continue;
-        }
 
-        BitBlt(
-            hdc,
-            offset,
-            y,
-            copyWidth,
-            bandHeight,
-            hdc,
-            0,
-            y,
-            SRCCOPY
-        );
+        if (offset >= 0)
+        {
+            BitBlt(
+                hdc,
+                offset,
+                y,
+                width - offset,
+                bandHeight,
+                hdc,
+                0,
+                y,
+                SRCCOPY
+            );
+        }
+        else
+        {
+            BitBlt(
+                hdc,
+                0,
+                y,
+                width + offset,
+                bandHeight,
+                hdc,
+                -offset,
+                y,
+                SRCCOPY
+            );
+        }
     }
 }
-
 
 /* =========================================================
    COLOR SHIFT
@@ -172,70 +157,47 @@ void EffectColorShift(
 )
 {
     int offset =
-        (int)((elapsed / 20) % 25) - 12;
+        (int)((elapsed / 25) % 25) - 12;
 
-    const int bandHeight = 3;
+    HPEN red =
+        CreatePen(PS_SOLID, 2, RGB(255, 0, 0));
 
-    HBRUSH redBrush =
-        CreateSolidBrush(
-            RGB(255, 0, 0)
-        );
+    HPEN cyan =
+        CreatePen(PS_SOLID, 2, RGB(0, 255, 255));
 
-    HBRUSH cyanBrush =
-        CreateSolidBrush(
-            RGB(0, 255, 255)
-        );
-
-    if (!redBrush || !cyanBrush)
+    if (!red || !cyan)
     {
-        if (redBrush)
-            DeleteObject(redBrush);
+        if (red)
+            DeleteObject(red);
 
-        if (cyanBrush)
-            DeleteObject(cyanBrush);
+        if (cyan)
+            DeleteObject(cyan);
 
         return;
     }
 
-    for (
-        int y = 0;
-        y < height;
-        y += bandHeight * 8
-    )
+    HPEN oldPen =
+        (HPEN)SelectObject(hdc, red);
+
+    for (int y = 0; y < height; y += 32)
     {
-        RECT redRect =
-        {
-            offset,
-            y,
-            width,
-            y + bandHeight
-        };
-
-        RECT cyanRect =
-        {
-            -offset,
-            y + bandHeight * 3,
-            width,
-            y + bandHeight * 4
-        };
-
-        FrameRect(
-            hdc,
-            &redRect,
-            redBrush
-        );
-
-        FrameRect(
-            hdc,
-            &cyanRect,
-            cyanBrush
-        );
+        MoveToEx(hdc, offset, y, NULL);
+        LineTo(hdc, width, y);
     }
 
-    DeleteObject(redBrush);
-    DeleteObject(cyanBrush);
-}
+    SelectObject(hdc, cyan);
 
+    for (int y = 16; y < height; y += 32)
+    {
+        MoveToEx(hdc, -offset, y, NULL);
+        LineTo(hdc, width, y);
+    }
+
+    SelectObject(hdc, oldPen);
+
+    DeleteObject(red);
+    DeleteObject(cyan);
+}
 
 /* =========================================================
    RANDOM RECTANGLES
@@ -248,49 +210,32 @@ void EffectRects(
     DWORD elapsed
 )
 {
-    srand(
-        (unsigned int)(elapsed / 40)
-    );
+    srand((unsigned int)(elapsed / 45));
 
-    for (int i = 0; i < 35; ++i)
+    for (int i = 0; i < 30; ++i)
     {
-        int x =
-            rand() % width;
+        int x = rand() % width;
+        int y = rand() % height;
 
-        int y =
-            rand() % height;
+        int w = 10 + rand() % 180;
+        int h = 3 + rand() % 40;
 
-        int rectWidth =
-            10 + rand() % 180;
+        if (x + w > width)
+            w = width - x;
 
-        int rectHeight =
-            2 + rand() % 45;
+        if (y + h > height)
+            h = height - y;
 
-        if (x + rectWidth > width)
-        {
-            rectWidth =
-                width - x;
-        }
-
-        if (y + rectHeight > height)
-        {
-            rectHeight =
-                height - y;
-        }
-
-        if (rectWidth <= 0 ||
-            rectHeight <= 0)
-        {
+        if (w <= 0 || h <= 0)
             continue;
-        }
-
-        int r = rand() % 256;
-        int g = rand() % 256;
-        int b = rand() % 256;
 
         HBRUSH brush =
             CreateSolidBrush(
-                RGB(r, g, b)
+                RGB(
+                    rand() % 256,
+                    rand() % 256,
+                    rand() % 256
+                )
             );
 
         if (!brush)
@@ -300,20 +245,15 @@ void EffectRects(
         {
             x,
             y,
-            x + rectWidth,
-            y + rectHeight
+            x + w,
+            y + h
         };
 
-        FillRect(
-            hdc,
-            &rect,
-            brush
-        );
+        FillRect(hdc, &rect, brush);
 
         DeleteObject(brush);
     }
 }
-
 
 /* =========================================================
    FLASH
@@ -327,17 +267,31 @@ void EffectFlash(
 )
 {
     /*
-       Короткая вспышка отключена:
-       оставляем событие в таймлайне,
-       но без резких белых кадров.
-    */
+     * Короткая, не постоянная вспышка.
+     * Делаем её серой, а не ярко-белой.
+     */
 
-    (void)hdc;
-    (void)width;
-    (void)height;
-    (void)elapsed;
+    if ((elapsed % 900) >= 70)
+        return;
+
+    HBRUSH brush =
+        CreateSolidBrush(RGB(180, 180, 180));
+
+    if (!brush)
+        return;
+
+    RECT rect =
+    {
+        0,
+        0,
+        width,
+        height
+    };
+
+    FillRect(hdc, &rect, brush);
+
+    DeleteObject(brush);
 }
-
 
 /* =========================================================
    CHAOS
@@ -358,57 +312,338 @@ void EffectChaos(
         intensity = 100;
 
     if (intensity >= 10)
-    {
-        EffectGlitch(
-            hdc,
-            width,
-            height,
-            elapsed
-        );
-    }
+        EffectGlitch(hdc, width, height, elapsed);
 
     if (intensity >= 25)
-    {
-        EffectShake(
-            hdc,
-            width,
-            height,
-            elapsed
-        );
-    }
+        EffectShake(hdc, width, height, elapsed);
 
     if (intensity >= 40)
-    {
-        EffectTear(
-            hdc,
-            width,
-            height,
-            elapsed
-        );
-    }
+        EffectTear(hdc, width, height, elapsed);
 
     if (intensity >= 55)
-    {
-        EffectColorShift(
-            hdc,
-            width,
-            height,
-            elapsed
-        );
-    }
+        EffectColorShift(hdc, width, height, elapsed);
 
     if (intensity >= 70)
-    {
-        EffectRects(
-            hdc,
-            width,
-            height,
-            elapsed
-        );
-    }
+        EffectRects(hdc, width, height, elapsed);
 
     /*
-       Flash намеренно не вызываем:
-       в хаосе и без него уже достаточно движухи.
-    */
+     * Не добавляем сильную вспышку в хаос.
+     */
+}
+
+/* =========================================================
+   SWIRL
+   ========================================================= */
+
+void EffectSwirl(
+    HDC hdc,
+    int width,
+    int height,
+    DWORD elapsed
+)
+{
+    int bandHeight = 24;
+
+    int shift =
+        (int)((elapsed / 18) % 120) - 60;
+
+    for (int y = 0; y < height; y += bandHeight)
+    {
+        int h = bandHeight;
+
+        if (y + h > height)
+            h = height - y;
+
+        if (h <= 0)
+            continue;
+
+        int offset =
+            ((y / bandHeight) % 2)
+                ? shift
+                : -shift;
+
+        if (offset >= 0)
+        {
+            BitBlt(
+                hdc,
+                offset,
+                y,
+                width - offset,
+                h,
+                hdc,
+                0,
+                y,
+                SRCCOPY
+            );
+        }
+        else
+        {
+            BitBlt(
+                hdc,
+                0,
+                y,
+                width + offset,
+                h,
+                hdc,
+                -offset,
+                y,
+                SRCCOPY
+            );
+        }
+    }
+}
+
+/* =========================================================
+   SCANLINES
+   ========================================================= */
+
+void EffectScanlines(
+    HDC hdc,
+    int width,
+    int height,
+    DWORD elapsed
+)
+{
+    (void)elapsed;
+
+    HBRUSH brush =
+        CreateSolidBrush(RGB(0, 0, 0));
+
+    if (!brush)
+        return;
+
+    for (int y = 0; y < height; y += 6)
+    {
+        RECT line =
+        {
+            0,
+            y,
+            width,
+            y + 2
+        };
+
+        FillRect(hdc, &line, brush);
+    }
+
+    DeleteObject(brush);
+}
+
+/* =========================================================
+   PIXELATE
+   ========================================================= */
+
+void EffectPixelate(
+    HDC hdc,
+    int width,
+    int height,
+    DWORD elapsed
+)
+{
+    int block =
+        8 + (int)((elapsed / 100) % 12);
+
+    /*
+     * Небольшое усреднение через StretchBlt.
+     */
+
+    HDC temp =
+        CreateCompatibleDC(hdc);
+
+    if (!temp)
+        return;
+
+    HBITMAP bitmap =
+        CreateCompatibleBitmap(
+            hdc,
+            width,
+            height
+        );
+
+    if (!bitmap)
+    {
+        DeleteDC(temp);
+        return;
+    }
+
+    HBITMAP old =
+        (HBITMAP)SelectObject(temp, bitmap);
+
+    BitBlt(
+        temp,
+        0,
+        0,
+        width,
+        height,
+        hdc,
+        0,
+        0,
+        SRCCOPY
+    );
+
+    for (int y = 0; y < height; y += block)
+    {
+        for (int x = 0; x < width; x += block)
+        {
+            int w = block;
+
+            if (x + w > width)
+                w = width - x;
+
+            int h = block;
+
+            if (y + h > height)
+                h = height - y;
+
+            if (w <= 0 || h <= 0)
+                continue;
+
+            StretchBlt(
+                hdc,
+                x,
+                y,
+                w,
+                h,
+                temp,
+                x,
+                y,
+                1,
+                1,
+                SRCCOPY
+            );
+        }
+    }
+
+    SelectObject(temp, old);
+
+    DeleteObject(bitmap);
+    DeleteDC(temp);
+}
+
+/* =========================================================
+   MIRROR
+   ========================================================= */
+
+void EffectMirror(
+    HDC hdc,
+    int width,
+    int height,
+    DWORD elapsed
+)
+{
+    (void)elapsed;
+
+    HDC temp =
+        CreateCompatibleDC(hdc);
+
+    if (!temp)
+        return;
+
+    HBITMAP bitmap =
+        CreateCompatibleBitmap(
+            hdc,
+            width,
+            height
+        );
+
+    if (!bitmap)
+    {
+        DeleteDC(temp);
+        return;
+    }
+
+    HBITMAP old =
+        (HBITMAP)SelectObject(temp, bitmap);
+
+    BitBlt(
+        temp,
+        0,
+        0,
+        width,
+        height,
+        hdc,
+        0,
+        0,
+        SRCCOPY
+    );
+
+    StretchBlt(
+        hdc,
+        0,
+        0,
+        width,
+        height,
+        temp,
+        width,
+        0,
+        -width,
+        height,
+        SRCCOPY
+    );
+
+    SelectObject(temp, old);
+
+    DeleteObject(bitmap);
+    DeleteDC(temp);
+}
+
+/* =========================================================
+   RGB SPLIT
+   ========================================================= */
+
+void EffectRGBSplit(
+    HDC hdc,
+    int width,
+    int height,
+    DWORD elapsed
+)
+{
+    int offset =
+        (int)((elapsed / 30) % 25) - 12;
+
+    HPEN red =
+        CreatePen(
+            PS_SOLID,
+            2,
+            RGB(255, 0, 0)
+        );
+
+    HPEN blue =
+        CreatePen(
+            PS_SOLID,
+            2,
+            RGB(0, 100, 255)
+        );
+
+    if (!red || !blue)
+    {
+        if (red)
+            DeleteObject(red);
+
+        if (blue)
+            DeleteObject(blue);
+
+        return;
+    }
+
+    HPEN old =
+        (HPEN)SelectObject(hdc, red);
+
+    for (int y = 0; y < height; y += 20)
+    {
+        MoveToEx(hdc, offset, y, NULL);
+        LineTo(hdc, width / 2, y);
+    }
+
+    SelectObject(hdc, blue);
+
+    for (int y = 10; y < height; y += 20)
+    {
+        MoveToEx(hdc, width / 2 - offset, y, NULL);
+        LineTo(hdc, width, y);
+    }
+
+    SelectObject(hdc, old);
+
+    DeleteObject(red);
+    DeleteObject(blue);
 }
