@@ -47,4 +47,12 @@ void EffectFlash(
     DWORD elapsed
 );
 
+void EffectChaos(
+    HDC hdc,
+    int width,
+    int height,
+    DWORD elapsed,
+    int intensity
+);
+
 #endif

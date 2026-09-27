@@ -24,10 +24,13 @@ static void EngineInit(EngineState* state)
 {
     state->running = TRUE;
 
-    state->startTime = GetTickCount();
+    state->startTime =
+        GetTickCount();
+
     state->elapsed = 0;
 
-    state->currentEvent = EVENT_NONE;
+    state->currentEvent =
+        EVENT_NONE;
 
     state->width =
         GetSystemMetrics(SM_CXSCREEN);
@@ -39,9 +42,12 @@ static void EngineInit(EngineState* state)
 }
 
 
-static void EngineUpdate(EngineState* state)
+static void EngineUpdate(
+    EngineState* state
+)
 {
-    DWORD now = GetTickCount();
+    DWORD now =
+        GetTickCount();
 
     state->elapsed =
         now - state->startTime;
@@ -53,7 +59,9 @@ static void EngineProcessEvents(
 )
 {
     EventType event =
-        TimelineGetEvent(state->elapsed);
+        TimelineGetEvent(
+            state->elapsed
+        );
 
     if (event != state->currentEvent)
     {
@@ -64,7 +72,8 @@ static void EngineProcessEvents(
             );
         }
 
-        state->currentEvent = event;
+        state->currentEvent =
+            event;
 
         if (event != EVENT_NONE)
         {
@@ -72,7 +81,8 @@ static void EngineProcessEvents(
         }
     }
 
-    if (TimelineIsFinished(state->elapsed))
+    if (TimelineIsFinished(
+            state->elapsed))
     {
         state->running = FALSE;
     }
@@ -88,7 +98,6 @@ static void EngineRender(
 
     if (!hdc)
         return;
-
 
     switch (state->currentEvent)
     {
@@ -165,50 +174,38 @@ static void EngineRender(
 
 
         case EVENT_CHAOS:
-
+        {
             /*
-             * Финальный комбо-режим.
+             * CHAOS длится 10 секунд.
              *
-             * Все основные эффекты работают
-             * одновременно.
+             * elapsed:
+             * 30000 -> 40000
+             *
+             * Превращаем его в:
+             * 0 -> 100
              */
 
-            EffectGlitch(
-                hdc,
-                state->width,
-                state->height,
-                state->elapsed
-            );
+            DWORD chaosTime =
+                state->elapsed - 30000;
 
-            EffectShake(
-                hdc,
-                state->width,
-                state->height,
-                state->elapsed
-            );
+            int intensity =
+                (int)(
+                    (chaosTime * 100) / 10000
+                );
 
-            EffectTear(
-                hdc,
-                state->width,
-                state->height,
-                state->elapsed
-            );
+            if (intensity > 100)
+                intensity = 100;
 
-            EffectColorShift(
+            EffectChaos(
                 hdc,
                 state->width,
                 state->height,
-                state->elapsed
-            );
-
-            EffectRects(
-                hdc,
-                state->width,
-                state->height,
-                state->elapsed
+                state->elapsed,
+                intensity
             );
 
             break;
+        }
 
 
         case EVENT_NONE:
@@ -217,7 +214,6 @@ static void EngineRender(
             break;
     }
 
-
     ReleaseDC(
         NULL,
         hdc
@@ -225,7 +221,9 @@ static void EngineRender(
 }
 
 
-BOOL EngineRun(HINSTANCE hInstance)
+BOOL EngineRun(
+    HINSTANCE hInstance
+)
 {
     (void)hInstance;
 
@@ -233,22 +231,14 @@ BOOL EngineRun(HINSTANCE hInstance)
 
     EngineInit(&state);
 
-
     while (state.running)
     {
         EngineUpdate(&state);
-
         EngineProcessEvents(&state);
-
         EngineRender(&state);
-
-        /*
-         * ~60 FPS
-         */
 
         Sleep(16);
     }
-
 
     return TRUE;
 }

@@ -11,7 +11,6 @@ typedef enum
     EVENT_COLOR_SHIFT,
     EVENT_RECTS,
     EVENT_FLASH,
-
     EVENT_CHAOS
 
 } EventType;

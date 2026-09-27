@@ -6,10 +6,6 @@
 static HWND g_window = NULL;
 
 
-/* =========================================================
-   ИНИЦИАЛИЗАЦИЯ
-   ========================================================= */
-
 void EffectsInit(HWND hwnd)
 {
     g_window = hwnd;
@@ -29,9 +25,7 @@ void EffectGlitch(
     DWORD elapsed
 )
 {
-    int offset;
-
-    offset =
+    int offset =
         (int)((elapsed / 40) % 20);
 
     if ((elapsed / 100) % 2 == 0)
@@ -76,13 +70,10 @@ void EffectShake(
     DWORD elapsed
 )
 {
-    int offsetX;
-    int offsetY;
-
-    offsetX =
+    int offsetX =
         (int)((elapsed / 17) % 31) - 15;
 
-    offsetY =
+    int offsetY =
         (int)((elapsed / 23) % 25) - 12;
 
     int copyWidth =
@@ -183,7 +174,7 @@ void EffectColorShift(
     int offset =
         (int)((elapsed / 20) % 25) - 12;
 
-    int bandHeight = 3;
+    const int bandHeight = 3;
 
     HBRUSH redBrush =
         CreateSolidBrush(
@@ -195,8 +186,7 @@ void EffectColorShift(
             RGB(0, 255, 255)
         );
 
-    if (!redBrush ||
-        !cyanBrush)
+    if (!redBrush || !cyanBrush)
     {
         if (redBrush)
             DeleteObject(redBrush);
@@ -294,14 +284,9 @@ void EffectRects(
             continue;
         }
 
-        int r =
-            rand() % 256;
-
-        int g =
-            rand() % 256;
-
-        int b =
-            rand() % 256;
+        int r = rand() % 256;
+        int g = rand() % 256;
+        int b = rand() % 256;
 
         HBRUSH brush =
             CreateSolidBrush(
@@ -342,33 +327,88 @@ void EffectFlash(
 )
 {
     /*
-     * Короткая белая вспышка.
-     */
+       Короткая вспышка отключена:
+       оставляем событие в таймлайне,
+       но без резких белых кадров.
+    */
 
-    if ((elapsed % 700) < 90)
+    (void)hdc;
+    (void)width;
+    (void)height;
+    (void)elapsed;
+}
+
+
+/* =========================================================
+   CHAOS
+   ========================================================= */
+
+void EffectChaos(
+    HDC hdc,
+    int width,
+    int height,
+    DWORD elapsed,
+    int intensity
+)
+{
+    if (intensity < 0)
+        intensity = 0;
+
+    if (intensity > 100)
+        intensity = 100;
+
+    if (intensity >= 10)
     {
-        HBRUSH white =
-            CreateSolidBrush(
-                RGB(255, 255, 255)
-            );
-
-        if (!white)
-            return;
-
-        RECT screen =
-        {
-            0,
-            0,
-            width,
-            height
-        };
-
-        FillRect(
+        EffectGlitch(
             hdc,
-            &screen,
-            white
+            width,
+            height,
+            elapsed
         );
-
-        DeleteObject(white);
     }
+
+    if (intensity >= 25)
+    {
+        EffectShake(
+            hdc,
+            width,
+            height,
+            elapsed
+        );
+    }
+
+    if (intensity >= 40)
+    {
+        EffectTear(
+            hdc,
+            width,
+            height,
+            elapsed
+        );
+    }
+
+    if (intensity >= 55)
+    {
+        EffectColorShift(
+            hdc,
+            width,
+            height,
+            elapsed
+        );
+    }
+
+    if (intensity >= 70)
+    {
+        EffectRects(
+            hdc,
+            width,
+            height,
+            elapsed
+        );
+    }
+
+    /*
+       Flash намеренно не вызываем:
+       в хаосе и без него уже достаточно движухи.
+    */
 }
