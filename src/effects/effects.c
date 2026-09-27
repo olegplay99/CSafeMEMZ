@@ -5,10 +5,18 @@
 
 static HWND g_window = NULL;
 
+
+/* =========================================================
+   ИНИЦИАЛИЗАЦИЯ
+   ========================================================= */
+
 void EffectsInit(HWND hwnd)
 {
     g_window = hwnd;
+
+    (void)g_window;
 }
+
 
 /* =========================================================
    GLITCH
@@ -21,7 +29,10 @@ void EffectGlitch(
     DWORD elapsed
 )
 {
-    int offset = (int)((elapsed / 40) % 20);
+    int offset;
+
+    offset =
+        (int)((elapsed / 40) % 20);
 
     if ((elapsed / 100) % 2 == 0)
     {
@@ -53,8 +64,9 @@ void EffectGlitch(
     }
 }
 
+
 /* =========================================================
-   1. SHAKE
+   SHAKE
    ========================================================= */
 
 void EffectShake(
@@ -64,18 +76,33 @@ void EffectShake(
     DWORD elapsed
 )
 {
-    int offsetX =
+    int offsetX;
+    int offsetY;
+
+    offsetX =
         (int)((elapsed / 17) % 31) - 15;
 
-    int offsetY =
+    offsetY =
         (int)((elapsed / 23) % 25) - 12;
+
+    int copyWidth =
+        width - abs(offsetX);
+
+    int copyHeight =
+        height - abs(offsetY);
+
+    if (copyWidth <= 0 ||
+        copyHeight <= 0)
+    {
+        return;
+    }
 
     BitBlt(
         hdc,
         offsetX,
         offsetY,
-        width - abs(offsetX),
-        height - abs(offsetY),
+        copyWidth,
+        copyHeight,
         hdc,
         0,
         0,
@@ -83,8 +110,9 @@ void EffectShake(
     );
 }
 
+
 /* =========================================================
-   2. HORIZONTAL TEAR
+   HORIZONTAL TEAR
    ========================================================= */
 
 void EffectTear(
@@ -94,12 +122,11 @@ void EffectTear(
     DWORD elapsed
 )
 {
-    int seed =
-        (int)(elapsed / 30);
+    srand(
+        (unsigned int)(elapsed / 30)
+    );
 
-    srand((unsigned int)seed);
-
-    int bands = 12;
+    const int bands = 12;
 
     for (int i = 0; i < bands; ++i)
     {
@@ -112,17 +139,26 @@ void EffectTear(
         int offset =
             (rand() % 81) - 40;
 
-        if (y + bandHeight > height)
-            bandHeight = height - y;
+        int copyWidth =
+            width - abs(offset);
 
-        if (bandHeight <= 0)
+        if (y + bandHeight > height)
+        {
+            bandHeight =
+                height - y;
+        }
+
+        if (bandHeight <= 0 ||
+            copyWidth <= 0)
+        {
             continue;
+        }
 
         BitBlt(
             hdc,
             offset,
             y,
-            width - abs(offset),
+            copyWidth,
             bandHeight,
             hdc,
             0,
@@ -132,8 +168,9 @@ void EffectTear(
     }
 }
 
+
 /* =========================================================
-   3. COLOR SHIFT
+   COLOR SHIFT
    ========================================================= */
 
 void EffectColorShift(
@@ -146,23 +183,35 @@ void EffectColorShift(
     int offset =
         (int)((elapsed / 20) % 25) - 12;
 
-    /*
-     * Сдвигаем цветовые ощущения через
-     * полупрозрачные цветные полосы.
-     *
-     * Само изображение рабочего стола
-     * не сохраняется и не записывается на диск.
-     */
-
     int bandHeight = 3;
 
     HBRUSH redBrush =
-        CreateSolidBrush(RGB(255, 0, 0));
+        CreateSolidBrush(
+            RGB(255, 0, 0)
+        );
 
     HBRUSH cyanBrush =
-        CreateSolidBrush(RGB(0, 255, 255));
+        CreateSolidBrush(
+            RGB(0, 255, 255)
+        );
 
-    for (int y = 0; y < height; y += bandHeight * 8)
+    if (!redBrush ||
+        !cyanBrush)
+    {
+        if (redBrush)
+            DeleteObject(redBrush);
+
+        if (cyanBrush)
+            DeleteObject(cyanBrush);
+
+        return;
+    }
+
+    for (
+        int y = 0;
+        y < height;
+        y += bandHeight * 8
+    )
     {
         RECT redRect =
         {
@@ -197,8 +246,9 @@ void EffectColorShift(
     DeleteObject(cyanBrush);
 }
 
+
 /* =========================================================
-   4. RANDOM RECTANGLES
+   RANDOM RECTANGLES
    ========================================================= */
 
 void EffectRects(
@@ -227,10 +277,16 @@ void EffectRects(
             2 + rand() % 45;
 
         if (x + rectWidth > width)
-            rectWidth = width - x;
+        {
+            rectWidth =
+                width - x;
+        }
 
         if (y + rectHeight > height)
-            rectHeight = height - y;
+        {
+            rectHeight =
+                height - y;
+        }
 
         if (rectWidth <= 0 ||
             rectHeight <= 0)
@@ -238,14 +294,22 @@ void EffectRects(
             continue;
         }
 
-        int r = rand() % 256;
-        int g = rand() % 256;
-        int b = rand() % 256;
+        int r =
+            rand() % 256;
+
+        int g =
+            rand() % 256;
+
+        int b =
+            rand() % 256;
 
         HBRUSH brush =
             CreateSolidBrush(
                 RGB(r, g, b)
             );
+
+        if (!brush)
+            continue;
 
         RECT rect =
         {
@@ -265,8 +329,9 @@ void EffectRects(
     }
 }
 
+
 /* =========================================================
-   5. FLASH
+   FLASH
    ========================================================= */
 
 void EffectFlash(
@@ -277,7 +342,7 @@ void EffectFlash(
 )
 {
     /*
-     * Короткие белые вспышки.
+     * Короткая белая вспышка.
      */
 
     if ((elapsed % 700) < 90)
@@ -286,6 +351,9 @@ void EffectFlash(
             CreateSolidBrush(
                 RGB(255, 255, 255)
             );
+
+        if (!white)
+            return;
 
         RECT screen =
         {

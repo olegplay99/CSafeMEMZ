@@ -19,6 +19,7 @@ typedef struct
 
 } EngineState;
 
+
 static void EngineInit(EngineState* state)
 {
     state->running = TRUE;
@@ -37,6 +38,7 @@ static void EngineInit(EngineState* state)
     EffectsInit(NULL);
 }
 
+
 static void EngineUpdate(EngineState* state)
 {
     DWORD now = GetTickCount();
@@ -44,6 +46,7 @@ static void EngineUpdate(EngineState* state)
     state->elapsed =
         now - state->startTime;
 }
+
 
 static void EngineProcessEvents(
     EngineState* state
@@ -75,14 +78,17 @@ static void EngineProcessEvents(
     }
 }
 
+
 static void EngineRender(
     EngineState* state
 )
 {
-    HDC hdc = GetDC(NULL);
+    HDC hdc =
+        GetDC(NULL);
 
     if (!hdc)
         return;
+
 
     switch (state->currentEvent)
     {
@@ -97,6 +103,7 @@ static void EngineRender(
 
             break;
 
+
         case EVENT_SHAKE:
 
             EffectShake(
@@ -107,6 +114,7 @@ static void EngineRender(
             );
 
             break;
+
 
         case EVENT_TEAR:
 
@@ -119,6 +127,7 @@ static void EngineRender(
 
             break;
 
+
         case EVENT_COLOR_SHIFT:
 
             EffectColorShift(
@@ -129,6 +138,7 @@ static void EngineRender(
             );
 
             break;
+
 
         case EVENT_RECTS:
 
@@ -141,6 +151,7 @@ static void EngineRender(
 
             break;
 
+
         case EVENT_FLASH:
 
             EffectFlash(
@@ -152,12 +163,67 @@ static void EngineRender(
 
             break;
 
+
+        case EVENT_CHAOS:
+
+            /*
+             * Финальный комбо-режим.
+             *
+             * Все основные эффекты работают
+             * одновременно.
+             */
+
+            EffectGlitch(
+                hdc,
+                state->width,
+                state->height,
+                state->elapsed
+            );
+
+            EffectShake(
+                hdc,
+                state->width,
+                state->height,
+                state->elapsed
+            );
+
+            EffectTear(
+                hdc,
+                state->width,
+                state->height,
+                state->elapsed
+            );
+
+            EffectColorShift(
+                hdc,
+                state->width,
+                state->height,
+                state->elapsed
+            );
+
+            EffectRects(
+                hdc,
+                state->width,
+                state->height,
+                state->elapsed
+            );
+
+            break;
+
+
+        case EVENT_NONE:
         default:
+
             break;
     }
 
-    ReleaseDC(NULL, hdc);
+
+    ReleaseDC(
+        NULL,
+        hdc
+    );
 }
+
 
 BOOL EngineRun(HINSTANCE hInstance)
 {
@@ -167,6 +233,7 @@ BOOL EngineRun(HINSTANCE hInstance)
 
     EngineInit(&state);
 
+
     while (state.running)
     {
         EngineUpdate(&state);
@@ -175,8 +242,13 @@ BOOL EngineRun(HINSTANCE hInstance)
 
         EngineRender(&state);
 
+        /*
+         * ~60 FPS
+         */
+
         Sleep(16);
     }
+
 
     return TRUE;
 }

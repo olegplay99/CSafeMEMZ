@@ -20,10 +20,13 @@ EventType TimelineGetEvent(DWORD elapsed)
     if (elapsed < 30000)
         return EVENT_FLASH;
 
+    if (elapsed < 40000)
+        return EVENT_CHAOS;
+
     return EVENT_NONE;
 }
 
 BOOL TimelineIsFinished(DWORD elapsed)
 {
-    return elapsed >= 30000;
+    return elapsed >= 40000;
 }

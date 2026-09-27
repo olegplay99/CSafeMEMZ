@@ -4,12 +4,15 @@
 typedef enum
 {
     EVENT_NONE = 0,
+
     EVENT_GLITCH,
     EVENT_SHAKE,
     EVENT_TEAR,
     EVENT_COLOR_SHIFT,
     EVENT_RECTS,
-    EVENT_FLASH
+    EVENT_FLASH,
+
+    EVENT_CHAOS
 
 } EventType;
 

@@ -3,10 +3,8 @@
 
 #include <windows.h>
 
-/* Инициализация системы эффектов */
 void EffectsInit(HWND hwnd);
 
-/* Базовый glitch */
 void EffectGlitch(
     HDC hdc,
     int width,
@@ -14,7 +12,6 @@ void EffectGlitch(
     DWORD elapsed
 );
 
-/* 1. Тряска экрана */
 void EffectShake(
     HDC hdc,
     int width,
@@ -22,7 +19,6 @@ void EffectShake(
     DWORD elapsed
 );
 
-/* 2. Горизонтальные разрывы */
 void EffectTear(
     HDC hdc,
     int width,
@@ -30,7 +26,6 @@ void EffectTear(
     DWORD elapsed
 );
 
-/* 3. Цветовой сдвиг */
 void EffectColorShift(
     HDC hdc,
     int width,
@@ -38,7 +33,6 @@ void EffectColorShift(
     DWORD elapsed
 );
 
-/* 4. Хаотичные прямоугольные фрагменты */
 void EffectRects(
     HDC hdc,
     int width,
@@ -46,7 +40,6 @@ void EffectRects(
     DWORD elapsed
 );
 
-/* 5. Вспышка */
 void EffectFlash(
     HDC hdc,
     int width,
