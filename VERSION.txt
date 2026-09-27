@@ -1,0 +1,2 @@
+CSafeMEMZ 0.7.0
+Safe visual simulation

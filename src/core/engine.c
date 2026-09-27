@@ -2,650 +2,188 @@
 #include "timeline.h"
 #include "event.h"
 #include "../effects/effects.h"
+#include "../ui/fake_windows.h"
+#include "../ui/outro.h"
+#include "../../include/config.h"
 
-#include <windows.h>
+#include <stdlib.h>
+#include <time.h>
 
+/*
+   Important: there is NO overlay window here.
+   The engine captures the desktop, modifies the backbuffer, and writes the
+   resulting frame directly to the desktop DC. This is why the effect looks
+   like it is happening on the desktop rather than inside a fake fullscreen window.
+*/
 typedef struct
 {
     BOOL running;
-
     DWORD startTime;
     DWORD elapsed;
-
     EventType currentEvent;
-
     int width;
     int height;
-
-    HWND overlay;
-
-    HDC screenDC;
+    HDC desktopDC;
     HDC backDC;
-
     HBITMAP backBitmap;
     HBITMAP oldBitmap;
-
+    HINSTANCE instance;
 } EngineState;
 
-static EngineState* g_state = NULL;
+static EngineState* g_state=NULL;
 
-
-/* =========================================================
-   WINDOW PROC
-   ========================================================= */
-
-static LRESULT CALLBACK OverlayProc(
-    HWND hwnd,
-    UINT message,
-    WPARAM wParam,
-    LPARAM lParam
-)
+static BOOL CreateBackbuffer(EngineState* s)
 {
-    (void)wParam;
-    (void)lParam;
-
-    switch (message)
-    {
-        case WM_ERASEBKGND:
-            return 1;
-
-        case WM_PAINT:
-        {
-            PAINTSTRUCT ps;
-
-            HDC hdc =
-                BeginPaint(hwnd, &ps);
-
-            if (g_state && g_state->backDC)
-            {
-                BitBlt(
-                    hdc,
-                    0,
-                    0,
-                    g_state->width,
-                    g_state->height,
-                    g_state->backDC,
-                    0,
-                    0,
-                    SRCCOPY
-                );
-            }
-
-            EndPaint(hwnd, &ps);
-
-            return 0;
-        }
-
-        case WM_NCHITTEST:
-            return HTTRANSPARENT;
-
-        default:
-            return DefWindowProc(
-                hwnd,
-                message,
-                wParam,
-                lParam
-            );
-    }
-}
-
-
-/* =========================================================
-   OVERLAY CREATE
-   ========================================================= */
-
-static BOOL CreateOverlay(
-    EngineState* state,
-    HINSTANCE hInstance
-)
-{
-    const char* className =
-        "CSafeMEMZOverlay";
-
-    WNDCLASSA wc;
-
-    ZeroMemory(
-        &wc,
-        sizeof(wc)
-    );
-
-    wc.lpfnWndProc =
-        OverlayProc;
-
-    wc.hInstance =
-        hInstance;
-
-    wc.lpszClassName =
-        className;
-
-    wc.hCursor =
-        LoadCursor(
-            NULL,
-            IDC_ARROW
-        );
-
-    wc.hbrBackground =
-        NULL;
-
-    if (!RegisterClassA(&wc))
-    {
-        if (GetLastError() != ERROR_CLASS_ALREADY_EXISTS)
-            return FALSE;
-    }
-
-    state->overlay =
-        CreateWindowExA(
-            WS_EX_TOPMOST |
-            WS_EX_TOOLWINDOW |
-            WS_EX_NOACTIVATE,
-
-            className,
-            "CSafeMEMZ",
-
-            WS_POPUP,
-
-            0,
-            0,
-            state->width,
-            state->height,
-
-            NULL,
-            NULL,
-            hInstance,
-            NULL
-        );
-
-    if (!state->overlay)
-        return FALSE;
-
-    ShowWindow(
-        state->overlay,
-        SW_SHOWNOACTIVATE
-    );
-
-    UpdateWindow(
-        state->overlay
-    );
-
+    s->desktopDC=GetDC(NULL);
+    if(!s->desktopDC)return FALSE;
+    s->backDC=CreateCompatibleDC(s->desktopDC);
+    if(!s->backDC)return FALSE;
+    s->backBitmap=CreateCompatibleBitmap(s->desktopDC,s->width,s->height);
+    if(!s->backBitmap)return FALSE;
+    s->oldBitmap=(HBITMAP)SelectObject(s->backDC,s->backBitmap);
     return TRUE;
 }
 
-
-/* =========================================================
-   BACKBUFFER
-   ========================================================= */
-
-static BOOL CreateBackbuffer(
-    EngineState* state
-)
+static void DestroyBackbuffer(EngineState* s)
 {
-    state->screenDC =
-        GetDC(NULL);
-
-    if (!state->screenDC)
-        return FALSE;
-
-    state->backDC =
-        CreateCompatibleDC(
-            state->screenDC
-        );
-
-    if (!state->backDC)
-        return FALSE;
-
-    state->backBitmap =
-        CreateCompatibleBitmap(
-            state->screenDC,
-            state->width,
-            state->height
-        );
-
-    if (!state->backBitmap)
-        return FALSE;
-
-    state->oldBitmap =
-        (HBITMAP)SelectObject(
-            state->backDC,
-            state->backBitmap
-        );
-
-    return TRUE;
+    if(s->backDC)
+    {
+        if(s->oldBitmap)SelectObject(s->backDC,s->oldBitmap);
+        DeleteDC(s->backDC);s->backDC=NULL;
+    }
+    if(s->backBitmap){DeleteObject(s->backBitmap);s->backBitmap=NULL;}
+    if(s->desktopDC){ReleaseDC(NULL,s->desktopDC);s->desktopDC=NULL;}
 }
 
-
-/* =========================================================
-   DESTROY BACKBUFFER
-   ========================================================= */
-
-static void DestroyBackbuffer(
-    EngineState* state
-)
+static BOOL EngineInit(EngineState* s,HINSTANCE instance)
 {
-    if (state->backDC)
-    {
-        if (state->oldBitmap)
-        {
-            SelectObject(
-                state->backDC,
-                state->oldBitmap
-            );
-        }
-
-        DeleteDC(
-            state->backDC
-        );
-
-        state->backDC = NULL;
-    }
-
-    if (state->backBitmap)
-    {
-        DeleteObject(
-            state->backBitmap
-        );
-
-        state->backBitmap = NULL;
-    }
-
-    if (state->screenDC)
-    {
-        ReleaseDC(
-            NULL,
-            state->screenDC
-        );
-
-        state->screenDC = NULL;
-    }
-}
-
-
-/* =========================================================
-   INIT
-   ========================================================= */
-
-static BOOL EngineInit(
-    EngineState* state,
-    HINSTANCE hInstance
-)
-{
-    ZeroMemory(
-        state,
-        sizeof(*state)
-    );
-
-    state->running = TRUE;
-
-    state->startTime =
-        GetTickCount();
-
-    state->elapsed = 0;
-
-    state->currentEvent =
-        EVENT_NONE;
-
-    state->width =
-        GetSystemMetrics(
-            SM_CXSCREEN
-        );
-
-    state->height =
-        GetSystemMetrics(
-            SM_CYSCREEN
-        );
-
+    ZeroMemory(s,sizeof(*s));
+    s->running=TRUE;
+    s->startTime=GetTickCount();
+    s->currentEvent=EVENT_NONE;
+    s->width=GetSystemMetrics(SM_CXSCREEN);
+    s->height=GetSystemMetrics(SM_CYSCREEN);
+    s->instance=instance;
+    srand((unsigned int)time(NULL));
+    if(!CreateBackbuffer(s)){DestroyBackbuffer(s);return FALSE;}
+    FakeWindowsInit(instance);
     EffectsInit(NULL);
-
-    if (!CreateBackbuffer(state))
-        return FALSE;
-
-    if (!CreateOverlay(
-            state,
-            hInstance))
-    {
-        DestroyBackbuffer(state);
-        return FALSE;
-    }
-
-    g_state = state;
-
+    g_state=s;
     return TRUE;
 }
 
-
-/* =========================================================
-   UPDATE
-   ========================================================= */
-
-static void EngineUpdate(
-    EngineState* state
-)
+static void EngineUpdate(EngineState* s)
 {
-    state->elapsed =
-        GetTickCount() -
-        state->startTime;
+    s->elapsed=GetTickCount()-s->startTime;
+    FakeWindowsUpdate(s->elapsed);
+
+    /* Escape is the emergency exit for the visual simulator. */
+    if(GetAsyncKeyState(VK_ESCAPE)&0x8000)s->running=FALSE;
 }
 
-
-/* =========================================================
-   EVENTS
-   ========================================================= */
-
-static void EngineProcessEvents(
-    EngineState* state
-)
+static void EngineProcessEvents(EngineState* s)
 {
-    EventType event =
-        TimelineGetEvent(
-            state->elapsed
-        );
-
-    if (event != state->currentEvent)
+    EventType e=TimelineGetEvent(s->elapsed);
+    if(e!=s->currentEvent)
     {
-        if (state->currentEvent != EVENT_NONE)
-        {
-            EventStop(
-                state->currentEvent
-            );
-        }
-
-        state->currentEvent =
-            event;
-
-        if (event != EVENT_NONE)
-        {
-            EventStart(event);
-        }
+        if(s->currentEvent!=EVENT_NONE)EventStop(s->currentEvent);
+        s->currentEvent=e;
+        if(e!=EVENT_NONE)EventStart(e);
     }
-
-    if (TimelineIsFinished(
-            state->elapsed))
-    {
-        state->running = FALSE;
-    }
+    if(TimelineIsFinished(s->elapsed))s->running=FALSE;
 }
 
-
-/* =========================================================
-   RENDER
-   ========================================================= */
-
-static void EngineRender(
-    EngineState* state
-)
+static void RenderEvent(EngineState* s)
 {
-    /*
-     * Сначала получаем свежий снимок
-     * рабочего стола.
-     */
-
-    BitBlt(
-        state->backDC,
-        0,
-        0,
-        state->width,
-        state->height,
-        state->screenDC,
-        0,
-        0,
-        SRCCOPY
-    );
-
-    /*
-     * Потом применяем эффект
-     * непосредственно к backbuffer.
-     */
-
-    switch (state->currentEvent)
+    DWORD t=s->elapsed;
+    switch(s->currentEvent)
     {
-        case EVENT_GLITCH:
-
-            EffectGlitch(
-                state->backDC,
-                state->width,
-                state->height,
-                state->elapsed
-            );
-
-            break;
-
-        case EVENT_SHAKE:
-
-            EffectShake(
-                state->backDC,
-                state->width,
-                state->height,
-                state->elapsed
-            );
-
-            break;
-
-        case EVENT_TEAR:
-
-            EffectTear(
-                state->backDC,
-                state->width,
-                state->height,
-                state->elapsed
-            );
-
-            break;
-
-        case EVENT_COLOR_SHIFT:
-
-            EffectColorShift(
-                state->backDC,
-                state->width,
-                state->height,
-                state->elapsed
-            );
-
-            break;
-
-        case EVENT_RECTS:
-
-            EffectRects(
-                state->backDC,
-                state->width,
-                state->height,
-                state->elapsed
-            );
-
-            break;
-
-        case EVENT_FLASH:
-
-            EffectFlash(
-                state->backDC,
-                state->width,
-                state->height,
-                state->elapsed
-            );
-
-            break;
-
+        case EVENT_GLITCH:          EffectGlitch(s->backDC,s->width,s->height,t); break;
+        case EVENT_SHAKE:           EffectShake(s->backDC,s->width,s->height,t); break;
+        case EVENT_TEAR:            EffectTear(s->backDC,s->width,s->height,t); break;
+        case EVENT_COLOR_SHIFT:     EffectColorShift(s->backDC,s->width,s->height,t); break;
+        case EVENT_RECTS:           EffectRects(s->backDC,s->width,s->height,t); break;
+        case EVENT_FLASH:           EffectFlash(s->backDC,s->width,s->height,t); break;
+        case EVENT_SWIRL:           EffectSwirl(s->backDC,s->width,s->height,t); break;
+        case EVENT_SCANLINES:       EffectScanlines(s->backDC,s->width,s->height,t); break;
+        case EVENT_PIXELATE:        EffectPixelate(s->backDC,s->width,s->height,t); break;
+        case EVENT_MIRROR:          EffectMirror(s->backDC,s->width,s->height,t); break;
+        case EVENT_RGB_SPLIT:       EffectRGBSplit(s->backDC,s->width,s->height,t); break;
+        case EVENT_WAVE:            EffectWave(s->backDC,s->width,s->height,t); break;
+        case EVENT_INVERT:          EffectInvert(s->backDC,s->width,s->height,t); break;
+        case EVENT_VERTICAL_TEAR:   EffectVerticalTear(s->backDC,s->width,s->height,t); break;
+        case EVENT_BARS:            EffectBars(s->backDC,s->width,s->height,t); break;
+        case EVENT_CHECKER:         EffectChecker(s->backDC,s->width,s->height,t); break;
+        case EVENT_ZOOM:            EffectZoom(s->backDC,s->width,s->height,t); break;
+        case EVENT_NOISE:           EffectNoise(s->backDC,s->width,s->height,t); break;
+        case EVENT_WARP:            EffectWarp(s->backDC,s->width,s->height,t); break;
+        case EVENT_COLOR_BANDS:     EffectColorBands(s->backDC,s->width,s->height,t); break;
+        case EVENT_SPIRAL:          EffectSpiral(s->backDC,s->width,s->height,t); break;
+        case EVENT_DESKTOP_FLICKER: EffectFlicker(s->backDC,s->width,s->height,t); break;
         case EVENT_CHAOS:
         {
-            DWORD chaosTime = 0;
-
-            if (state->elapsed >= 30000)
-                chaosTime =
-                    state->elapsed - 30000;
-
-            int intensity =
-                (int)(
-                    chaosTime * 100 / 10000
-                );
-
-            if (intensity < 0)
-                intensity = 0;
-
-            if (intensity > 100)
-                intensity = 100;
-
-            EffectChaos(
-                state->backDC,
-                state->width,
-                state->height,
-                state->elapsed,
-                intensity
-            );
-
+            DWORD local=t>=85000?t-85000:0;
+            int intensity=(int)(local/50);
+            if(intensity>100)intensity=100;
+            EffectFinalChaos(s->backDC,s->width,s->height,t,intensity);
             break;
         }
-
-        case EVENT_SWIRL:
-
-            EffectSwirl(
-                state->backDC,
-                state->width,
-                state->height,
-                state->elapsed
-            );
-
+        case EVENT_FINAL:
+            OutroDraw(s->backDC,s->width,s->height,t);
             break;
-
-        case EVENT_SCANLINES:
-
-            EffectScanlines(
-                state->backDC,
-                state->width,
-                state->height,
-                state->elapsed
-            );
-
-            break;
-
-        case EVENT_PIXELATE:
-
-            EffectPixelate(
-                state->backDC,
-                state->width,
-                state->height,
-                state->elapsed
-            );
-
-            break;
-
-        case EVENT_MIRROR:
-
-            EffectMirror(
-                state->backDC,
-                state->width,
-                state->height,
-                state->elapsed
-            );
-
-            break;
-
-        case EVENT_RGB_SPLIT:
-
-            EffectRGBSplit(
-                state->backDC,
-                state->width,
-                state->height,
-                state->elapsed
-            );
-
-            break;
-
-        case EVENT_NONE:
-        default:
-            break;
+        default: break;
     }
+}
+
+static void EngineRender(EngineState* s)
+{
+    /* Fresh desktop snapshot each frame. */
+    BitBlt(s->backDC,0,0,s->width,s->height,s->desktopDC,0,0,SRCCOPY);
 
     /*
-     * Выводим результат на overlay.
-     */
+       There is deliberately NO fullscreen intro window and NO overlay.
+       The first frame is the real desktop, and every visual effect is
+       composited back into the desktop DC itself.
+    */
+    RenderEvent(s);
 
-    if (state->overlay)
-    {
-        InvalidateRect(
-            state->overlay,
-            NULL,
-            FALSE
-        );
+    /* The actual desktop is the render target. */
+    BitBlt(s->desktopDC,0,0,s->width,s->height,s->backDC,0,0,SRCCOPY);
 
-        UpdateWindow(
-            state->overlay
-        );
-    }
+    /* Keep simulated windows visible above the desktop render. */
+    FakeWindowsRepaintAll();
 }
 
-
-/* =========================================================
-   SHUTDOWN
-   ========================================================= */
-
-static void EngineShutdown(
-    EngineState* state
-)
+static void EngineShutdown(EngineState* s)
 {
-    if (state->overlay)
-    {
-        DestroyWindow(
-            state->overlay
-        );
-
-        state->overlay = NULL;
-    }
-
-    DestroyBackbuffer(state);
-
-    g_state = NULL;
+    FakeWindowsShutdown();
+    EffectsShutdown();
+    DestroyBackbuffer(s);
+    g_state=NULL;
 }
 
-
-/* =========================================================
-   RUN
-   ========================================================= */
-
-BOOL EngineRun(
-    HINSTANCE hInstance
-)
+BOOL EngineRun(HINSTANCE hInstance)
 {
-    EngineState state;
+    EngineState s;
+    MSG msg;
 
-    if (!EngineInit(
-            &state,
-            hInstance))
+    if(!EngineInit(&s,hInstance))return FALSE;
+
+    while(s.running)
     {
-        return FALSE;
-    }
-
-    while (state.running)
-    {
-        MSG msg;
-
-        while (PeekMessage(
-                   &msg,
-                   NULL,
-                   0,
-                   0,
-                   PM_REMOVE))
+        while(PeekMessageA(&msg,NULL,0,0,PM_REMOVE))
         {
-            if (msg.message == WM_QUIT)
-            {
-                state.running = FALSE;
-                break;
-            }
-
+            if(msg.message==WM_QUIT){s.running=FALSE;break;}
             TranslateMessage(&msg);
-            DispatchMessage(&msg);
+            DispatchMessageA(&msg);
         }
-
-        if (!state.running)
-            break;
-
-        EngineUpdate(&state);
-
-        EngineProcessEvents(&state);
-
-        EngineRender(&state);
-
-        Sleep(16);
+        if(!s.running)break;
+        EngineUpdate(&s);
+        EngineProcessEvents(&s);
+        EngineRender(&s);
+        Sleep(CS_MEMZ_FPS_DELAY);
     }
 
-    EngineShutdown(&state);
-
+    EngineShutdown(&s);
     return TRUE;
 }

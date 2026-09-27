@@ -6,5 +6,6 @@
 
 EventType TimelineGetEvent(DWORD elapsed);
 BOOL TimelineIsFinished(DWORD elapsed);
+DWORD TimelineDuration(void);
 
 #endif
